@@ -14,7 +14,8 @@ import { InvestorPieChart } from "@/components/charts/investor-pie-chart";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, LogOut, TrendingUp, TrendingDown, Wallet, Users, BarChart3, AlertCircle, DollarSign, Plus, Minus } from "lucide-react";
+import { RefreshCw, LogOut, TrendingUp, TrendingDown, Wallet, Users, BarChart3, AlertCircle, DollarSign, Plus, Minus, Settings } from "lucide-react";
+import Link from "next/link";
 
 interface PortfolioData {
   portfolio: {
@@ -285,6 +286,12 @@ export default function DashboardPage() {
                 Sync
               </Button>
             )}
+            <Link href="/settings">
+              <Button variant="ghost" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+            </Link>
             <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
               <LogOut className="h-4 w-4 mr-2" />
               Logout
