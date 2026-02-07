@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Investors (renamed from Founder)
+// ─────────────────────────────────────────────
+model Investor {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  email     String?
+  isAdmin   Boolean  @default(false)
+  isFounder Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shareTransactions ShareTransaction[]
+  transactions      Transaction[]
+}
+
+// ─────────────────────────────────────────────
+// Share Ledger (tracks ownership changes)
+// ─────────────────────────────────────────────
+model ShareTransaction {
+  id               String   @id @default(cuid())
+  investorId       String
+  investor         Investor @relation(fields: [investorId], references: [id])
+  type             String   // BUY, SELL, INITIAL
+  shares           Float
+  navAtTransaction Float
+  amount           Float
+  timestamp        DateTime @default(now())
+
+  @@index([investorId])
+  @@index([timestamp])
+}
+
+// ─────────────────────────────────────────────
+// Trade History (synced from Binance)
+// ─────────────────────────────────────────────
+model Trade {
+  id           String    @id @default(cuid())
+  binanceId    String    @unique
+  symbol       String
+  side         String
+  positionSide String
+  entryPrice   Float
+  exitPrice    Float?
+  quantity     Float
+  leverage     Int       @default(1)
+  margin       Float?
+  pnl          Float?
+  pnlPercent   Float?
+  commission   Float     @default(0)
+  status       String    @default("OPEN")
+  openedAt     DateTime
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Analytics fields
+  strategy  String?
+  setup     String?
+  notes     String?
+  rating    Int?
+
+  @@index([symbol])
+  @@index([status])
+  @@index([strategy])
+  @@index([openedAt])
+}
+
+// ─────────────────────────────────────────────
+// Portfolio Snapshots (for charts + NAV)
+// ─────────────────────────────────────────────
+model Snapshot {
+  id            String   @id @default(cuid())
+  totalValue    Float
+  totalShares   Float    @default(18)
+  nav           Float    @default(1)
+  availableUsdt Float
+  unrealizedPnl Float    @default(0)
+  marginUsed    Float    @default(0)
+  btcPrice      Float?
+  trigger       String   @default("daily")
+  timestamp     DateTime @default(now())
+
+  // Trading stats (cumulative from all closed trades)
+  totalTrades Int    @default(0)
+  wins        Int    @default(0)
+  losses      Int    @default(0)
+  totalPnl    Float  @default(0) // Realized PnL
+  winRate     Float  @default(0) // Percentage (0-100)
+  avgWin      Float  @default(0) // Average winning trade PnL
+  avgLoss     Float  @default(0) // Average losing trade PnL
+
+  @@index([timestamp])
+}
+
+// ─────────────────────────────────────────────
+// Capital Transactions
+// ─────────────────────────────────────────────
+model Transaction {
+  id          String    @id @default(cuid())
+  type        String
+  amount      Float
+  currency    String    @default("USDT")
+  investorId  String?
+  investor    Investor? @relation(fields: [investorId], references: [id])
+  description String?
+  txHash      String?
+  timestamp   DateTime  @default(now())
+
+  @@index([investorId])
+  @@index([type])
+}
+
+// ─────────────────────────────────────────────
+// Strategy Reference
+// ─────────────────────────────────────────────
+model Strategy {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  isBot       Boolean @default(false)
+  isActive    Boolean @default(true)
+}
+
+// ─────────────────────────────────────────────
+// System Settings
+// ─────────────────────────────────────────────
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
