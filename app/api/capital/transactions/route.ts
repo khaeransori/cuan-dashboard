@@ -3,10 +3,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(request: NextRequest) {
+// Auth: accepts either session OR webhook secret
+async function isAuthorized(request: NextRequest): Promise<{ authorized: boolean; isAdmin: boolean; userId?: string }> {
   const session = await getServerSession(authOptions);
+  if (session) return { authorized: true, isAdmin: session.user.isAdmin, userId: session.user.id };
 
-  if (!session) {
+  const webhookSecret = process.env.WEBHOOK_SECRET;
+  const providedSecret = request.headers.get("X-Webhook-Secret");
+  if (webhookSecret && providedSecret === webhookSecret) return { authorized: true, isAdmin: true };
+
+  return { authorized: false, isAdmin: false };
+}
+
+export async function GET(request: NextRequest) {
+  const auth = await isAuthorized(request);
+
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,9 +30,9 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get("offset") || "0");
 
     // Non-admins can only see their own transactions
-    const filterInvestorId = session.user.isAdmin
+    const filterInvestorId = auth.isAdmin
       ? investorId || undefined
-      : session.user.id;
+      : auth.userId;
 
     // Build where clause
     const where: {
