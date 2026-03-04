@@ -14,6 +14,7 @@ interface ContributeRequest {
   amount: number;
   description?: string;
   txHash?: string;
+  navOverride?: number; // Lock NAV for batch contributions (admin only)
 }
 
 export async function POST(request: NextRequest) {
@@ -30,11 +31,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: ContributeRequest = await request.json();
-    const { investorId, amount, description, txHash } = body;
+    const { investorId, amount, description, txHash, navOverride } = body;
 
     if (!investorId || !amount || amount <= 0) {
       return NextResponse.json(
         { error: "Invalid request: investorId and positive amount required" },
+        { status: 400 }
+      );
+    }
+
+    if (navOverride !== undefined && navOverride <= 0) {
+      return NextResponse.json(
+        { error: "navOverride must be a positive number" },
         { status: 400 }
       );
     }
@@ -48,11 +56,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Investor not found" }, { status: 404 });
     }
 
-    // Get current NAV
+    // Get current NAV — use navOverride if provided (for batch contributions)
     const navData = await getCurrentNav();
+    const effectiveNav = navOverride ?? navData.nav;
 
-    // Calculate shares to issue
-    const sharesToIssue = calculateSharesForContribution(amount, navData.nav);
+    // Calculate shares to issue using effective NAV
+    const sharesToIssue = calculateSharesForContribution(amount, effectiveNav);
 
     // Create share transaction
     const shareTransaction = await prisma.shareTransaction.create({
@@ -60,7 +69,7 @@ export async function POST(request: NextRequest) {
         investorId,
         type: "BUY",
         shares: sharesToIssue,
-        navAtTransaction: navData.nav,
+        navAtTransaction: effectiveNav,
         amount,
       },
     });
@@ -113,7 +122,8 @@ export async function POST(request: NextRequest) {
       shareTransaction: {
         id: shareTransaction.id,
         shares: sharesToIssue,
-        navAtTransaction: navData.nav,
+        navAtTransaction: effectiveNav,
+        navWasOverridden: !!navOverride,
         amount,
       },
       transaction: {

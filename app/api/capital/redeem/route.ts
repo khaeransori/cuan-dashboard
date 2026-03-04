@@ -15,6 +15,7 @@ interface RedeemRequest {
   shares: number;
   description?: string;
   txHash?: string;
+  navOverride?: number; // Lock NAV for batch redemptions (admin only)
 }
 
 export async function POST(request: NextRequest) {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: RedeemRequest = await request.json();
-    const { investorId, shares, description, txHash } = body;
+    const { investorId, shares, description, txHash, navOverride } = body;
 
     if (!investorId || !shares || shares <= 0) {
       return NextResponse.json(
@@ -59,11 +60,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get current NAV
+    // Get current NAV — use navOverride if provided (for batch redemptions)
     const navData = await getCurrentNav();
+    const effectiveNav = navOverride ?? navData.nav;
 
-    // Calculate redemption amount
-    const redemptionAmount = calculateAmountForRedemption(shares, navData.nav);
+    // Calculate redemption amount using effective NAV
+    const redemptionAmount = calculateAmountForRedemption(shares, effectiveNav);
 
     // Create share transaction (negative shares for redemption)
     const shareTransaction = await prisma.shareTransaction.create({
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
         investorId,
         type: "SELL",
         shares: -shares, // Negative to reduce holdings
-        navAtTransaction: navData.nav,
+        navAtTransaction: effectiveNav,
         amount: -redemptionAmount, // Negative as it's an outflow
       },
     });
@@ -124,7 +126,8 @@ export async function POST(request: NextRequest) {
       shareTransaction: {
         id: shareTransaction.id,
         shares: -shares,
-        navAtTransaction: navData.nav,
+        navAtTransaction: effectiveNav,
+        navWasOverridden: !!navOverride,
         redemptionAmount,
       },
       transaction: {
