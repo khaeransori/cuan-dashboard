@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Get current portfolio value for snapshot
+    // Use Binance wallet balance as source of truth — do NOT subtract amount again
+    // because the withdrawal is already reflected in totalWalletBalance
     let totalValue = navData.totalValue - redemptionAmount;
     let availableUsdt = 0;
     let unrealizedPnl = 0;
@@ -98,8 +100,8 @@ export async function POST(request: NextRequest) {
       try {
         const liveData = await getAccountInfo();
         if (liveData) {
-          totalValue = liveData.totalWalletBalance - redemptionAmount;
-          availableUsdt = Math.max(0, liveData.availableBalance - redemptionAmount);
+          totalValue = liveData.totalWalletBalance;
+          availableUsdt = liveData.availableBalance;
           unrealizedPnl = liveData.totalUnrealizedProfit;
           marginUsed = liveData.totalPositionInitialMargin;
         }

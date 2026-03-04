@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Get current portfolio value for snapshot
+    // Use Binance wallet balance as source of truth — do NOT add amount again
+    // because the deposit is already reflected in totalWalletBalance
     let totalValue = navData.totalValue + amount;
     let availableUsdt = amount;
     let unrealizedPnl = 0;
@@ -87,8 +89,8 @@ export async function POST(request: NextRequest) {
       try {
         const liveData = await getAccountInfo();
         if (liveData) {
-          totalValue = liveData.totalWalletBalance + amount;
-          availableUsdt = liveData.availableBalance + amount;
+          totalValue = liveData.totalWalletBalance;
+          availableUsdt = liveData.availableBalance;
           unrealizedPnl = liveData.totalUnrealizedProfit;
           marginUsed = liveData.totalPositionInitialMargin;
         }
