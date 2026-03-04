@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccountInfo, isConfigured } from "@/lib/binance";
 import { createSnapshot } from "@/lib/nav";
+import { requireAdmin } from "@/lib/api-auth";
 import crypto from "crypto";
-
-// Auth: accepts either session OR webhook secret
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  // Check session first (dashboard users)
-  const session = await getServerSession(authOptions);
-  if (session) return true;
-
-  // Check webhook secret (bot)
-  const webhookSecret = process.env.WEBHOOK_SECRET;
-  const providedSecret = request.headers.get("X-Webhook-Secret");
-  if (webhookSecret && providedSecret === webhookSecret) return true;
-
-  return false;
 }
 
 const BINANCE_FUTURES_URL = "https://fapi.binance.com";
@@ -182,7 +168,8 @@ async function syncTrades(): Promise<number> {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

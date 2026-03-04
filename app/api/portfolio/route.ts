@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAccountInfo, getPositions, isConfigured } from "@/lib/binance";
 import { getCurrentNav, getAllInvestorShares } from "@/lib/nav";
+import { requireAdmin } from "@/lib/api-auth";
 
 interface BinancePosition {
   symbol: string;
@@ -14,10 +13,9 @@ interface BinancePosition {
   leverage: string;
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

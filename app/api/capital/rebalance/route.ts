@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccountInfo, isConfigured } from "@/lib/binance";
 import { createSnapshot } from "@/lib/nav";
-
-// Auth: accepts either session OR webhook secret
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.isAdmin) return true;
-
-  const webhookSecret = process.env.WEBHOOK_SECRET;
-  const providedSecret = request.headers.get("X-Webhook-Secret");
-  if (webhookSecret && providedSecret === webhookSecret) return true;
-
-  return false;
-}
+import { requireAdmin } from "@/lib/api-auth";
 
 /**
  * POST /api/capital/rebalance
@@ -29,7 +16,8 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
  * Admin only.
  */
 export async function POST(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -178,7 +166,8 @@ export async function POST(request: NextRequest) {
  * Preview current vs equal distribution (same as POST ?dryRun=true)
  */
 export async function GET(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

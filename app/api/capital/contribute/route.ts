@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   getCurrentNav,
@@ -8,6 +6,7 @@ import {
   createSnapshot,
 } from "@/lib/nav";
 import { getAccountInfo, isConfigured } from "@/lib/binance";
+import { requireAdmin } from "@/lib/api-auth";
 
 interface ContributeRequest {
   investorId: string;
@@ -18,15 +17,9 @@ interface ContributeRequest {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Only admins can process contributions
-  if (!session.user.isAdmin) {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
   try {

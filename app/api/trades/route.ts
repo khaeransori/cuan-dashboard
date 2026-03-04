@@ -1,22 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-// Auth: accepts either session OR webhook secret
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-  if (session) return true;
-
-  const webhookSecret = process.env.WEBHOOK_SECRET;
-  const providedSecret = request.headers.get("X-Webhook-Secret");
-  if (webhookSecret && providedSecret === webhookSecret) return true;
-
-  return false;
-}
+import { requireAdmin } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
